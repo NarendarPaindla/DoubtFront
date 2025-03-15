@@ -3,15 +3,17 @@ import appointmentService from '../../services/appointmentService';
 import { 
   Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, Tabs, Tab, Box, 
-  FormControl, InputLabel, Select, MenuItem, Typography 
+  FormControl, InputLabel, Select, MenuItem, Typography,
+  TextField 
 } from '@mui/material';
 
-const statusOptions = ["ALL", "ACCEPTED", "REJECTED", "RESCHEDULED", "DONE"];
+const statusOptions = ["ALL", "PENDING", "ACCEPTED", "REJECTED", "RESCHEDULED", "DONE"];
 
 const ViewAppointments = () => {
   const [appointments, setAppointments] = useState([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [tabIndex, setTabIndex] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
   const user = JSON.parse(localStorage.getItem("user") || "null");
 
   useEffect(() => {
@@ -26,25 +28,30 @@ const ViewAppointments = () => {
     fetchAppointments();
   }, [user.id]);
 
-  // Handler for tab change (for filtering)
+  // Handle tab changes (status filter)
   const handleTabChange = (event, newValue) => {
     setTabIndex(newValue);
     setStatusFilter(statusOptions[newValue]);
   };
 
-  // Handler for dropdown change (for filtering, synchronized with tabs)
+  // Sync the dropdown with tabs
   const handleFilterChange = (event) => {
     const value = event.target.value;
     setStatusFilter(value);
     setTabIndex(statusOptions.indexOf(value));
   };
 
-  // Handler for updating appointment status using the dropdown in each row
+  // Update search term as user types
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+  };
+
+  // Update appointment status
   const handleStatusChange = async (appointmentId, newStatus) => {
     try {
       await appointmentService.updateAppointmentStatus(appointmentId, newStatus);
       alert("Appointment updated");
-      // Update the appointment list locally
+      // Update local state
       setAppointments(prev =>
         prev.map(app => app.id === appointmentId ? { ...app, status: newStatus } : app)
       );
@@ -54,10 +61,22 @@ const ViewAppointments = () => {
     }
   };
 
-  // Filter appointments based on the current statusFilter
-  const filteredAppointments = statusFilter === "ALL" 
-    ? appointments 
-    : appointments.filter(app => app.status.toUpperCase() === statusFilter);
+  // Filter appointments by status and search term
+  const filteredAppointments = appointments
+    .filter(app => {
+      // If "ALL" is selected, keep all; otherwise match the chosen status
+      return statusFilter === "ALL"
+        ? true
+        : app.status.toUpperCase() === statusFilter;
+    })
+    .filter(app => {
+      // If searchTerm is empty, keep all; otherwise check studentName or ID
+      if (!searchTerm.trim()) return true;
+      const nameOrId = app.studentName
+        ? app.studentName.toLowerCase()
+        : (app.studentId || "").toLowerCase();
+      return nameOrId.includes(searchTerm.toLowerCase());
+    });
 
   return (
     <Paper sx={{ mt: 4, p: 2 }}>
@@ -65,7 +84,7 @@ const ViewAppointments = () => {
         Trainer Appointments
       </Typography>
       
-      {/* Tabs and Dropdown Filter */}
+      {/* Status Tabs and Filter Dropdown */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
         <Tabs 
           value={tabIndex} 
@@ -93,6 +112,18 @@ const ViewAppointments = () => {
         </FormControl>
       </Box>
 
+      {/* Search Bar */}
+      <Box sx={{ mb: 2 }}>
+        <TextField
+          label="Search by Student Name"
+          variant="outlined"
+          size="small"
+          fullWidth
+          value={searchTerm}
+          onChange={handleSearchChange}
+        />
+      </Box>
+
       {/* Appointment Table */}
       <TableContainer component={Paper}>
         <Table>
@@ -114,6 +145,7 @@ const ViewAppointments = () => {
                   <TableCell>{new Date(app.appointmentTime).toLocaleString()}</TableCell>
                   <TableCell>{app.status}</TableCell>
                   <TableCell align="center">
+                    {/* Status Update Dropdown or Buttons */}
                     <FormControl variant="outlined" size="small" sx={{ width: 140 }}>
                       <InputLabel>Status</InputLabel>
                       <Select
@@ -121,7 +153,7 @@ const ViewAppointments = () => {
                         label="Status"
                         onChange={(e) => handleStatusChange(app.id, e.target.value)}
                       >
-                        {["ACCEPTED", "REJECTED", "RESCHEDULED", "DONE"].map(status => (
+                        {["PENDING", "ACCEPTED", "REJECTED", "RESCHEDULED", "DONE"].map(status => (
                           <MenuItem key={status} value={status}>{status}</MenuItem>
                         ))}
                       </Select>

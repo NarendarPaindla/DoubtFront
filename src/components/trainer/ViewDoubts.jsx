@@ -1,92 +1,216 @@
 import React, { useEffect, useState } from 'react';
 import doubtService from '../../services/doubtService';
 import userService from '../../services/userService';
-import { Grid, Paper, Typography, Box, TextField, Button, Divider } from '@mui/material';
+import {
+  Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, Paper, Typography, Button,
+  Box, Drawer, TextField
+} from '@mui/material';
 
+/**
+ * This component shows a table of doubts.
+ * Clicking "Reply" opens a bottom-anchored chat panel for that specific doubt.
+ */
 const ViewDoubts = () => {
   const [doubts, setDoubts] = useState([]);
-  const [replyText, setReplyText] = useState("");
-  const [studentNames, setStudentNames] = useState({});
+  const [activeDoubt, setActiveDoubt] = useState(null); // The selected doubt for the chat
+  const [chatOpen, setChatOpen] = useState(false);       // Controls the bottom drawer
+  const [studentNames, setStudentNames] = useState({});  // Maps studentId -> studentName
+  const [newReply, setNewReply] = useState('');          // Text for the new reply message
 
+  // Fetch all doubts on mount
   useEffect(() => {
     const fetchDoubts = async () => {
       try {
         const data = await doubtService.getAllDoubts();
         setDoubts(data);
-        const uniqueIds = [...new Set(data.map(doubt => doubt.studentId))];
+
+        // Build map of student names for display
+        const uniqueIds = [...new Set(data.map(d => d.studentId))];
         const namesMap = {};
-        await Promise.all(
-          uniqueIds.map(async (id) => {
-            try {
-              const student = await userService.getUserById(id);
-              namesMap[id] = student.username;
-            } catch (err) {
-              namesMap[id] = id;
-            }
-          })
-        );
+        for (let id of uniqueIds) {
+          try {
+            const student = await userService.getUserById(id);
+            namesMap[id] = student.name || student.username;
+          } catch (err) {
+            namesMap[id] = id;
+          }
+        }
         setStudentNames(namesMap);
       } catch (error) {
-        console.error("Error fetching doubts", error);
+        console.error("Error fetching doubts:", error);
       }
     };
     fetchDoubts();
   }, []);
 
-  const handleReply = async (doubtId) => {
+  // Open the chat drawer for a specific doubt
+  const openChat = (doubt) => {
+    setActiveDoubt(doubt);
+    setChatOpen(true);
+    setNewReply('');
+  };
+
+  // Close the chat drawer
+  const closeChat = () => {
+    setChatOpen(false);
+    setActiveDoubt(null);
+    setNewReply('');
+  };
+
+  // Handle sending a new reply
+  const handleSendReply = async () => {
+    if (!activeDoubt) return;
     try {
+      const trainerId = JSON.parse(localStorage.getItem("user")).id;
       const reply = {
-        trainerId: JSON.parse(localStorage.getItem("user")).id,
-        replyText,
+        trainerId,
+        replyText: newReply,
         repliedAt: new Date().toISOString()
       };
-      await doubtService.replyToDoubt(doubtId, reply);
-      alert("Reply sent");
-      setReplyText('');
-      window.location.reload();
+      await doubtService.replyToDoubt(activeDoubt.id, reply);
+
+      // Update local state so the new reply appears in the conversation
+      setDoubts(prev => prev.map(d => 
+        d.id === activeDoubt.id
+          ? { ...d, replies: [...(d.replies || []), reply] }
+          : d
+      ));
+
+      // Also update activeDoubt's replies
+      setActiveDoubt(prev => ({
+        ...prev,
+        replies: [...(prev.replies || []), reply]
+      }));
+
+      setNewReply('');
     } catch (error) {
-      console.error("Error sending reply", error);
+      console.error("Error sending reply:", error);
+      alert("Failed to send reply");
     }
   };
 
+  // For chat bubble styling, you might align trainer replies to the right,
+  // student messages to the left, etc. We'll do a simple color distinction:
+  const isTrainerMessage = (reply) => {
+    const trainerId = JSON.parse(localStorage.getItem("user")).id;
+    return reply.trainerId === trainerId;
+  };
+
   return (
-    <Grid container spacing={3} sx={{ mt: 4 }}>
-      {doubts.map(doubt => (
-        <Grid item xs={12} key={doubt.id}>
-          <Paper elevation={3} sx={{ p: 3 }}>
-            <Typography variant="h6">Doubt ID: {doubt.id}</Typography>
-            <Typography variant="body1">
-              Student: {studentNames[doubt.studentId] || doubt.studentId}
+    <Paper sx={{ mt: 4, p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        View Doubts
+      </Typography>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Doubt ID</TableCell>
+              <TableCell>Student Name</TableCell>
+              <TableCell>Doubt</TableCell>
+              <TableCell>Posted At</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell align="center">Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {doubts.map((doubt) => {
+              const replied = doubt.replies && doubt.replies.length > 0;
+              return (
+                <TableRow key={doubt.id}>
+                  <TableCell>{doubt.id}</TableCell>
+                  <TableCell>{studentNames[doubt.studentId] || doubt.studentId}</TableCell>
+                  <TableCell>{doubt.doubtText}</TableCell>
+                  <TableCell>{new Date(doubt.createdAt).toLocaleString()}</TableCell>
+                  <TableCell>{replied ? "Replied" : "Open"}</TableCell>
+                  <TableCell align="center">
+                    <Button 
+                      variant="contained" 
+                      size="small" 
+                      onClick={() => openChat(doubt)}
+                    >
+                      Reply
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {doubts.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  No doubts found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Bottom-anchored chat drawer */}
+      <Drawer
+        anchor="bottom"
+        open={chatOpen}
+        onClose={closeChat}
+        PaperProps={{ sx: { height: 400, borderRadius: '12px 12px 0 0' } }}
+      >
+        {activeDoubt && (
+          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Header */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="h6">Chat with Student</Typography>
+              <Button variant="outlined" size="small" onClick={closeChat}>Close</Button>
+            </Box>
+            <Typography variant="subtitle2" color="textSecondary">
+              Doubt: {activeDoubt.doubtText}
             </Typography>
-            <Typography variant="body1">Doubt: {doubt.doubtText}</Typography>
-            <Typography variant="body2" color="textSecondary">
-              Posted at: {new Date(doubt.createdAt).toLocaleString()}
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            <TextField
-              label="Reply"
-              fullWidth
-              multiline
-              rows={3}
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              margin="normal"
-            />
-            <Button variant="contained" color="primary" onClick={() => handleReply(doubt.id)}>
-              Send Reply
-            </Button>
-            {doubt.replies && doubt.replies.map((reply, index) => (
-              <Paper key={index} elevation={1} sx={{ p: 2, mt: 2 }}>
-                <Typography variant="body2">{reply.replyText}</Typography>
-                <Typography variant="caption" color="textSecondary">
-                  Replied at: {new Date(reply.repliedAt).toLocaleString()}
-                </Typography>
-              </Paper>
-            ))}
-          </Paper>
-        </Grid>
-      ))}
-    </Grid>
+
+            {/* Chat messages area */}
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', my: 2, p: 1, backgroundColor: '#f9f9f9', borderRadius: 2 }}>
+              {/* Original Doubt as first message (optional if you want a separate bubble) */}
+              {/* Then replies */}
+              {activeDoubt.replies && activeDoubt.replies.map((reply, index) => {
+                const trainerId = JSON.parse(localStorage.getItem("user")).id;
+                const isTrainerMsg = reply.trainerId === trainerId;
+                return (
+                  <Box
+                    key={index}
+                    sx={{
+                      mb: 1,
+                      p: 1,
+                      maxWidth: '70%',
+                      alignSelf: isTrainerMsg ? 'flex-end' : 'flex-start',
+                      backgroundColor: isTrainerMsg ? '#cce5ff' : '#e2e2e2',
+                      borderRadius: 2
+                    }}
+                  >
+                    <Typography variant="body2">{reply.replyText}</Typography>
+                    <Typography variant="caption" sx={{ display: 'block', textAlign: 'right' }}>
+                      {new Date(reply.repliedAt).toLocaleString()}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+
+            {/* Reply input area */}
+            <Box sx={{ display: 'flex' }}>
+              <TextField
+                variant="outlined"
+                size="small"
+                fullWidth
+                placeholder="Type your reply..."
+                value={newReply}
+                onChange={(e) => setNewReply(e.target.value)}
+              />
+              <Button variant="contained" sx={{ ml: 1 }} onClick={handleSendReply}>
+                Send
+              </Button>
+            </Box>
+          </Box>
+        )}
+      </Drawer>
+    </Paper>
   );
 };
 
