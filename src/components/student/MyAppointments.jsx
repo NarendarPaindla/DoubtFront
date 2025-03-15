@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import appointmentService from '../../services/appointmentService';
 import { Grid, Paper, Typography, Divider } from '@mui/material';
 
@@ -20,12 +20,16 @@ const MyAppointments = () => {
 
   return (
     <Grid container spacing={3} sx={{ mt: 4 }}>
-      {appointments.map((app) => (
+      {appointments.map(app => (
         <Grid item xs={12} key={app.id}>
           <Paper elevation={3} sx={{ p: 3 }}>
             <Typography variant="h6">Appointment ID: {app.id}</Typography>
-            <Typography variant="body1">Trainer ID: {app.trainerId}</Typography>
-            <Typography variant="body1">Time: {new Date(app.appointmentTime).toLocaleString()}</Typography>
+            <Typography variant="body1">
+              Trainer Name: {app.trainerName || app.trainerId}
+            </Typography>
+            <Typography variant="body1">
+              Time: {new Date(app.appointmentTime).toLocaleString()}
+            </Typography>
             <Typography variant="body1">Status: {app.status}</Typography>
             <Divider sx={{ my: 1 }} />
           </Paper>

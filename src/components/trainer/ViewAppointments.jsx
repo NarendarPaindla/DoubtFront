@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import appointmentService from '../../services/appointmentService';
-import { Box, Typography, Paper, Grid, Button, Divider } from '@mui/material';
+import { Grid, Paper, Typography, Box, Button, Divider } from '@mui/material';
 
 const ViewAppointments = () => {
   const [appointments, setAppointments] = useState([]);
+  const user = JSON.parse(localStorage.getItem("user") || "null");
 
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
-        const trainerId = JSON.parse(localStorage.getItem("user")).id;
-        const data = await appointmentService.getAppointmentsByTrainer(trainerId);
+        const data = await appointmentService.getAppointmentsByTrainer(user.id);
         setAppointments(data);
       } catch (error) {
         console.error("Error fetching appointments", error);
       }
     };
     fetchAppointments();
-  }, []);
+  }, [user.id]);
 
   const handleStatusChange = async (appointmentId, status) => {
     try {
@@ -34,7 +34,9 @@ const ViewAppointments = () => {
          <Grid item xs={12} key={app.id}>
            <Paper elevation={3} sx={{ p: 3 }}>
              <Typography variant="h6">Appointment ID: {app.id}</Typography>
-             <Typography variant="body1">Student ID: {app.studentId}</Typography>
+             <Typography variant="body1">
+               Student Name: {app.studentName || app.studentId}
+             </Typography>
              <Typography variant="body1">
                Time: {new Date(app.appointmentTime).toLocaleString()}
              </Typography>
