@@ -16,6 +16,8 @@ import ViewDoubts from './components/trainer/ViewDoubts';
 import ManageIssues from './components/trainer/ManageIssues';
 import PostAnnouncement from './components/trainer/PostAnnouncement';
 import Sidebar from './components/Sidebar';
+import ForgotPassword from './components/auth/ForgotPassword';
+import ResetPassword from './components/auth/ResetPassword';
 
 const drawerWidth = 240;
 
@@ -95,6 +97,8 @@ const App = () => {
                   : <Navigate to="/login" />
               }
             />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
         </Container>
       </Box>

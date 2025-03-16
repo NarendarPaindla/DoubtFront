@@ -29,7 +29,7 @@ const Login = () => {
     <Grid container justifyContent="center">
       <Grid item xs={12} sm={8} md={5}>
         <Paper elevation={6} sx={{ p: 4, mt: 8 }}>
-          <Typography variant="h5" component="h1" align="center" gutterBottom>
+          <Typography variant="h5" align="center" gutterBottom>
             Login
           </Typography>
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
@@ -54,9 +54,14 @@ const Login = () => {
             <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 3 }}>
               Login
             </Button>
-            <Typography variant="body2" align="center" sx={{ mt: 2 }}>
-              Don't have an account? <Link to="/register">Register</Link>
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+              <Typography variant="body2">
+                <Link to="/register" style={{ textDecoration: 'none' }}>Register</Link>
+              </Typography>
+              <Typography variant="body2">
+                <Link to="/forgot-password" style={{ textDecoration: 'none' }}>Forgot Password?</Link>
+              </Typography>
+            </Box>
           </Box>
         </Paper>
       </Grid>
